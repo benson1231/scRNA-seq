@@ -132,7 +132,7 @@ kl_seurat <- createSeuratObjEachSample (project.nam = "kl",
 data.list <- list("k" = k_seurat, "kl" = kl_seurat)
 # select features that are repeatedly variable across datasets for integration
 features <- Seurat::SelectIntegrationFeatures(object.list = data.list, 
-                                              nfeatures = 1000,
+                                              nfeatures = 2000,
                                               verbose = FALSE)
 class(features)
 length(features)
@@ -141,7 +141,6 @@ features[1:10]
 anchors <- Seurat::FindIntegrationAnchors(object.list = data.list, 
                                           anchor.features = features,
                                           verbose = F)
-
 
 # this command creates an 'integrated' data assay
 combined.obj <- Seurat::IntegrateData(anchorset = anchors)
@@ -154,11 +153,16 @@ combined.obj <- Seurat::RunPCA(combined.obj, npcs = 50, verbose = FALSE)
 ElbowPlot(combined.obj, ndims = 50)
 pcs <- 20
 combined.obj <- combined.obj %>%
-  Seurat::RunUMAP(reduction = "pca", dims = 1:pcs, verbose = FALSE) %>%
+  Seurat::RunUMAP(reduction = "pca", umap.method = "uwot", dims = 1:pcs, verbose = FALSE) %>%
   Seurat::RunTSNE(reduction="pca", dims= 1:pcs, verbose = FALSE) %>%
   Seurat::FindNeighbors(reduction = "pca", dims = 1:pcs, verbose = FALSE) %>%
-  Seurat::FindClusters(resolution = 0.5, verbose = FALSE)
-  Seurat::FindClusters(resolution = 1, verbose = FALSE)
+  Seurat::FindClusters(resolution = 0.06, verbose = FALSE)
+
+# combined.obj <- combined.obj %>%  ## resolution太高
+#   Seurat::RunUMAP(reduction = "pca", umap.method = "uwot", dims = 1:pcs, verbose = FALSE) %>%
+#   Seurat::RunTSNE(reduction="pca", dims= 1:pcs, verbose = FALSE) %>%
+#   Seurat::FindNeighbors(reduction = "pca", dims = 1:pcs, verbose = FALSE) %>%
+#   Seurat::FindClusters(resolution = 1, verbose = FALSE)
 ### 建議儲存下來
 saveRDS(combined.obj, "integrated_seurat_object.rds")
 
@@ -238,21 +242,34 @@ Seurat::DimPlot(regress.obj, reduction="umap", group.by = "Phase")
 combined.obj <- readRDS("combined.obj.RDS")
 DimPlot(combined.obj)
 ### Cluster 2 vs. the others
-c2.markers <- Seurat::FindMarkers(combined.obj, 
-                                  ident.1 = 2, min.pct = 0.25,  # 至少要多少比例細胞符合
+c18.markers <- Seurat::FindMarkers(combined.obj, 
+                                  ident.1 = 18, min.pct = 0.25,  # 至少要多少比例細胞符合
                                   only.pos = TRUE) ### Using default assay
-head(c2.markers)
-VlnPlot(combined.obj, features = c("Cd177"))
-FeaturePlot(combined.obj, features = c("Cd177"), reduction = "umap")
+head(c18.markers)
+VlnPlot(combined.obj, features = c("Ebf1"))
+FeaturePlot(combined.obj, features = c("Ebf1"), reduction = "umap")
 # Markers for each cluster
 markers <- FindAllMarkers(combined.obj, only.pos = TRUE) %>% 
   group_by(cluster) %>%
-  dplyr::filter(avg_log2FC > 1) %>% 
-  slice_head(n = 10) %>%
+  dplyr::filter(avg_log2FC > 0.5) %>% 
+  dplyr::arrange(desc(avg_log2FC)) %>% 
+  slice_head(n = 50) %>%
   ungroup() -> top10
-DoHeatmap(combined.obj, features = top10$gene) + NoLegend()
+Seurat::DoHeatmap(combined.obj, group.by = "ident", features = top10$gene,draw.lines = TRUE) + NoLegend()
 head(markers)
 write.table(top10[,6:7],file = "top10.csv",sep=",",row.names = F)
+openxlsx::write.xlsx(top10[,6:7], "top50.xlsx", sheetName = "Sheet1")
+
+Seurat::DimPlot(combined.obj, reduction="umap", label = T)
+FeaturePlot(combined.obj, reduction="umap", features = "Ccr9")
+
+# Assigning cell type identity to clusters(base on CellMarker2.0)
+new.cluster.ids <- c("T cell","Endothelial cell","cancer cell 1","B cell","Neutrophils","NK cell",
+                     "Dendritic cell","Macrophage","cancer cell 2","Plasmacytoid dendritic cell"
+                     )
+names(new.cluster.ids) <- levels(combined.obj)
+com <- RenameIdents(combined.obj, new.cluster.ids)
+Seurat::DimPlot(com, reduction="umap", label = T)
 
 # Compare c0 vs. c3
 deg_bw_c0_and_c3 <- Seurat::FindMarkers(combined.obj, 
