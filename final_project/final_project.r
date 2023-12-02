@@ -186,7 +186,7 @@ combined.obj <- file.path(data.dir, "integrated_seurat_object.rds") %>% readRDS(
 ### 5. Find markers for each cluster -------------------------------------------
 markers <- FindAllMarkers(combined.obj, only.pos = TRUE) %>% 
   group_by(cluster) %>%
-  dplyr::filter(avg_log2FC > 0.5) %>% 
+  dplyr::filter(avg_log2FC > 1) %>% 
   dplyr::arrange(desc(avg_log2FC)) %>% 
   slice_head(n = 10) %>%
   ungroup() -> top10
@@ -195,7 +195,8 @@ Seurat::DoHeatmap(combined.obj, group.by = "ident", features = top10$gene,draw.l
 openxlsx::write.xlsx(top10[,6:7], "top10.xlsx", sheetName = "Sheet1")  # 存檔
 head(markers)
 # 可以將特定gene作圖
-FeaturePlot(combined.obj, reduction="umap", features = "Iglv2", label = T)
+FeaturePlot(combined.obj, reduction="umap", features = "Cd19", label = T)
+VlnPlot(combined.obj, features = c("Cd19", "Cd3e"))
 
 ### 6.annotation(from paper) -----------------------------------------------------
 b_cell_mark <- c("Cd19","Cd22","Cd79a","Cd79b")
@@ -221,6 +222,7 @@ p1 <- FeaturePlot(combined.obj, reduction="umap", features = "Cd3e", label = T) 
 p2 <- FeaturePlot(combined.obj, reduction="umap", features = "Tcf7", label = T)  # activated T cell
 p3 <- FeaturePlot(combined.obj, reduction="umap", features = "Ctla4", label = T) # exhausted T cell
 cowplot::plot_grid(p1, p2, p3, ncol = 3)
+VlnPlot(combined.obj, features = c("Cd3e","Tcf7","Ctla4"))
 
 # 將marker_list輸出
 marker_list <- c(b_cell_mark, cancer_mark, dendritic_mark, endo_mark, macrophage_mark, 
@@ -245,41 +247,45 @@ combined.obj$`new cluster`[combined.obj$`new cluster` == "9"] <- "Plasmacytoid d
 combined.obj <- SetIdent(combined.obj, value = combined.obj@meta.data$`new cluster`)
 Seurat::DimPlot(combined.obj, reduction="umap", label = T)  
 
-
-
-
-
-
-
-VlnPlot(combined.obj, features = c("nFeature_RNA", "nCount_RNA"), ncol = 2)
-VlnPlot(combined.obj, features = c("Ebf1"))
-FeaturePlot(combined.obj, features = c("Tcf7", "Ctla4"), reduction = "umap",blend = TRUE)
-
-
-
-VlnPlot(combined.obj, features = c("Tcf7", "Ctla4"))
+# visualization
+features <- c("Cd3e","Ctla4")
+# Ridge plots - from ggridges. Visualize single cell expression distributions in each cluster
 RidgePlot(combined.obj, features = features, ncol = 2)
-
-RidgePlot(combined.obj, features = c("Tcf7"), ncol = 2, assay = "RNA")
-markers.to.plot <- c("Cd3d", "Crem", "HSPH1", "SELL", "GIMAP5", "CACYBP", "GNLY", "NKG7", "CCL5",
-                     "CD8A", "MS4A1", "CD79A", "MIR155HG", "NME1", "FCGR3A", "VMO1", "CCL2", "S100A9", "HLA-DQA1",
-                     "GPR183", "PPBP", "GNG11", "HBA2", "HBB", "TSPAN13", "IL3RA", "IGJ", "PRSS57")
-DotPlot(combined.obj, features = markers.to.plot, cols = c("blue", "red"), dot.scale = 8, split.by = "k") +
+# Violin plot - Visualize single cell expression distributions in each cluster
+VlnPlot(combined.obj, features = features, ncol = 2)
+VlnPlot(combined.obj, features = features, split.by = "orig.ident")
+# Feature plot - visualize feature expression in low-dimensional space
+FeaturePlot(combined.obj, features = features)
+FeaturePlot(combined.obj, features = features, reduction = "umap",blend = TRUE)
+FeaturePlot(combined.obj, features = features, split.by = "orig.ident")
+# Dot plots - the size of the dot corresponds to the percentage of cells expressing the
+# feature in each cluster. The color represents the average expression level
+DotPlot(combined.obj, features = features) + RotatedAxis()
+# Single cell heatmap of feature expression
+DoHeatmap(subset(combined.obj, downsample = 100), features = top10$gene, size = 3) + NoLegend()
+# Identify conserved cell type markers
+sg <- list(bcell = c("Cd19","Cd22","Cd79a","Cd79b"),
+           cancer = c("Epcam","Krt18","Krt8","Krt19"),
+           dendritic = c("Cd86","Cd83","Clec10a","Ccl22","Cxcl16","Xcr1","Rab7b","Naaa","Btla"),
+           endo = c("Pecam1","Tek","Plvap","Thbd","Tmem100","Adgrf5","Podxl","Nostrin","Acvrl1"),
+           macrophage = c("Adgre1","Itgam","Itgal","Cd14","Ccl9","F13a1","Cx3cr1","Cd68"),
+           neutro= c("Csf3r","Cxcr2S100a8"),
+           nkcell = c("Klrd1","Nkg7","Prf1","Gzma","Gzmb","Ccl5","Cma1","Klre1","Klra4"),
+           plasma_dend = c("Ccr9","Bst2"),
+           tcell = c("Cd3d","Cd5","Cd3e"))
+DotPlot(combined.obj, features = sg, cols = c("blue", "red"), dot.scale = 4, assay = "RNA") +
   RotatedAxis()
 
 
 
 
-# sg <- list(cell1 = c("Cd19","Cd22","Cd79a","Cd79b"),
-#            cell2 = c("Epcam","Krt18","Krt8","Krt19"),
-#            cell3 = c("Cd86","Cd83","Clec10a","Ccl22","Cxcl16","Xcr1","Rab7b","Naaa","Btla"),
-#            cell4 = c("Pecam1","Tek","Plvap","Thbd","Tmem100","Adgrf5","Podxl","Nostrin","Acvrl1"),
-#            cell5 = c("Adgre1","Itgam","Itgal","Cd14","Ccl9","F13a1","Cx3cr1","Cd68"),
-#            cell6 = c("Csf3r","Cxcr2S100a8"),  
-#            cell7 = c("Klrd1","Nkg7","Prf1","Gzma","Gzmb","Ccl5","Cma1","Klre1","Klra4"),
-#            cell8 = c("Ccr9","Bst2"),
-#            cell9 = c("Cd3d","Cd5","Cd3e")
-# )
+
+
+
+
+
+
+
 # feature <- list(top10$gene)
 # combined.obj <- Seurat::AddModuleScore(combined.obj, features = sg, name = "sg")
 # FeaturePlot(combined.obj, reduction = "umap", features = "sg1")
