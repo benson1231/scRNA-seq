@@ -3,9 +3,6 @@ library("Seurat")
 library("dplyr")
 library("magrittr")
 
-### 資料path設定 ---------------------------------------------------------------
-setwd("/Users/benson/Desktop/Transcriptome")
-data.dir <- file.path("final")
 ### 將單一樣本資料前處理，寫成一個function -------------------------------------
 # (1)讀檔 (matrix.mtx, barcode.tsv, and feature.tsv)
 # (2)去除duplicated genes
@@ -106,7 +103,7 @@ createSeuratObjEachSample <- function(project.name,
 
 ### 1. 將每個樣本建構出Seurat object -------------------------------------------
 k_seurat <- createSeuratObjEachSample (project.nam = "k", 
-                                       dir = file.path(data.dir, "K"),
+                                       dir = "K",
                                        min.cells = 3,
                                        min.features = 500,
                                        max.features = 6000,
@@ -117,7 +114,7 @@ k_seurat <- createSeuratObjEachSample (project.nam = "k",
                                        normalization.method = "LogNormalize",
                                        hvf.selection.method = "vst")
 kl_seurat <- createSeuratObjEachSample (project.nam = "kl", 
-                                        dir = file.path(data.dir, "KL"),
+                                        dir = "KL",
                                         min.cells = 3,
                                         min.features = 500,
                                         max.features = 6000,
@@ -162,26 +159,21 @@ VizDimLoadings(combined.obj, dims = 1:2, reduction = "pca")
 DimPlot(combined.obj, reduction = "pca") + NoLegend()
 DimHeatmap(combined.obj, dims = 1, cells = 500, balanced = TRUE)
 
-### 4. Run non-linear dimensional reduction (UMAP/tSNE)
+### 4. Run non-linear dimensional reduction (UMAP/tSNE) ------------------------
 combined.obj <- combined.obj %>%
   Seurat::RunUMAP(reduction = "pca", umap.method = "uwot", dims = 1:pcs, verbose = FALSE) %>%
   Seurat::RunTSNE(reduction="pca", dims= 1:pcs, verbose = FALSE) %>%
   Seurat::FindNeighbors(reduction = "pca", dims = 1:pcs, verbose = FALSE) %>%
   Seurat::FindClusters(resolution = 0.06, verbose = FALSE) %>%  # paper提供resolution = 0.06
   Seurat::FindSubCluster("0",resolution = 0.06, graph.name = "integrated_snn", 
-                         subcluster.name = "new cluster")  # T cell進一步subcluster
+                         subcluster.name = "new_cluster")  # T cell進一步subcluster
 # 觀察cluster狀況
 Seurat::DimPlot(combined.obj, reduction="umap")  
 Seurat::DimPlot(combined.obj, reduction="tsne")
 Seurat::DimPlot(combined.obj, reduction="tsne", group.by = "orig.ident")
-Seurat::DimPlot(combined.obj, reduction="tsne", group.by = "new cluster")
+Seurat::DimPlot(combined.obj, reduction="umap", group.by = "new_cluster")
 # 觀察Feature狀況
 FeaturePlot(combined.obj, reduction="umap", features = "Mito_percent")
-
-# ### 存檔 ---------------------------------------------------------------------
-# saveRDS(combined.obj, "integrated_seurat_object.rds")
-# -> 後續分析(由此讀檔)
-combined.obj <- file.path(data.dir, "integrated_seurat_object.rds") %>% readRDS()
 
 ### 5. Find markers for each cluster -------------------------------------------
 markers <- FindAllMarkers(combined.obj, only.pos = TRUE) %>% 
@@ -191,8 +183,8 @@ markers <- FindAllMarkers(combined.obj, only.pos = TRUE) %>%
   slice_head(n = 10) %>%
   ungroup() -> top10
 # 將找到的marker進行視覺化，作heatmap
-Seurat::DoHeatmap(combined.obj, group.by = "ident", features = top10$gene,draw.lines = TRUE) + NoLegend()
-openxlsx::write.xlsx(top10[,6:7], "top10.xlsx", sheetName = "Sheet1")  # 存檔
+Seurat::DoHeatmap(combined.obj, group.by = "ident", features = top10$gene, 
+                  draw.lines = TRUE) + NoLegend()
 head(markers)
 # 可以將特定gene作圖
 FeaturePlot(combined.obj, reduction="umap", features = "Cd19", label = T)
@@ -232,25 +224,25 @@ for(i in marker_list){
   ggplot2::ggsave(paste0("plot_", gsub(" ", "_", i), ".png"))
 }
 # cluster annotation
-combined.obj$`new cluster`[combined.obj$`new cluster` == "0_0"] <- "T cell activated"
-combined.obj$`new cluster`[combined.obj$`new cluster` == "0_1"] <- "T cell exhausted"
-combined.obj$`new cluster`[combined.obj$`new cluster` == "1"] <- "Endothelial cell"
-combined.obj$`new cluster`[combined.obj$`new cluster` == "2"] <- "Macrophage"
-combined.obj$`new cluster`[combined.obj$`new cluster` == "3"] <- "B cell"
-combined.obj$`new cluster`[combined.obj$`new cluster` == "4"] <- "Neutrophils"
-combined.obj$`new cluster`[combined.obj$`new cluster` == "5"] <- "dendritic cell"
-combined.obj$`new cluster`[combined.obj$`new cluster` == "6"] <- "NK cell"
-combined.obj$`new cluster`[combined.obj$`new cluster` == "7"] <- "cancer cell1"
-combined.obj$`new cluster`[combined.obj$`new cluster` == "8"] <- "cancer cell2"
-combined.obj$`new cluster`[combined.obj$`new cluster` == "9"] <- "Plasmacytoid dendritic cell"
+combined.obj$`new_cluster`[combined.obj$`new_cluster` == "0_0"] <- "T cell activated"
+combined.obj$`new_cluster`[combined.obj$`new_cluster` == "0_1"] <- "T cell exhausted"
+combined.obj$`new_cluster`[combined.obj$`new_cluster` == "1"] <- "Endothelial cell"
+combined.obj$`new_cluster`[combined.obj$`new_cluster` == "2"] <- "Macrophage"
+combined.obj$`new_cluster`[combined.obj$`new_cluster` == "3"] <- "B cell"
+combined.obj$`new_cluster`[combined.obj$`new_cluster` == "4"] <- "Neutrophils"
+combined.obj$`new_cluster`[combined.obj$`new_cluster` == "5"] <- "dendritic cell"
+combined.obj$`new_cluster`[combined.obj$`new_cluster` == "6"] <- "NK cell"
+combined.obj$`new_cluster`[combined.obj$`new_cluster` == "7"] <- "cancer cell1"
+combined.obj$`new_cluster`[combined.obj$`new_cluster` == "8"] <- "cancer cell2"
+combined.obj$`new_cluster`[combined.obj$`new_cluster` == "9"] <- "Plasmacytoid dendritic cell"
 
-combined.obj <- SetIdent(combined.obj, value = combined.obj@meta.data$`new cluster`)
+combined.obj <- SetIdent(combined.obj, value = combined.obj@meta.data$`new_cluster`)
 Seurat::DimPlot(combined.obj, reduction="umap", label = T)  
 
-# visualization
+### 7.visualization ------------------------------------------------------------
 features <- c("Cd3e","Ctla4")
 # Ridge plots - from ggridges. Visualize single cell expression distributions in each cluster
-RidgePlot(combined.obj, features = features, ncol = 2)
+RidgePlot(combined.obj, features = features, ncol = 1)
 # Violin plot - Visualize single cell expression distributions in each cluster
 VlnPlot(combined.obj, features = features, ncol = 2)
 VlnPlot(combined.obj, features = features, split.by = "orig.ident")
@@ -276,106 +268,83 @@ sg <- list(bcell = c("Cd19","Cd22","Cd79a","Cd79b"),
 DotPlot(combined.obj, features = sg, cols = c("blue", "red"), dot.scale = 4, assay = "RNA") +
   RotatedAxis()
 
+### 8.計算細胞種類數量 ---------------------------------------------------------
+cell_proportions <- combined.obj@meta.data[,c(1,7)]
+cell_ratio <- table(cell_proportions) %>% t() %>% as.data.frame()
+k_total_cell <- cell_ratio$Freq[1:11] %>% sum()
+kl_total_cell <- cell_ratio$Freq[12:22] %>% sum()
+k_table <- cell_ratio[1:10,]
+kl_table <- cell_ratio[11:22,]
+k_table$ratio <- k_table$Freq/k_total_cell
+kl_table$ratio <- kl_table$Freq/kl_total_cell
+final <- rbind(k_table,kl_table) %>% set_names(c("cluster","ident","freq","ratio"))
 
+# 創建 bar plot
+library(ggplot2)
+p <- ggplot(data = final, aes(x = ratio, y = ident, fill = cluster)) +
+  geom_bar(stat = "identity") + theme_void()
+p
 
+# 創建T cell exhausted violin plot
+VlnPlot(combined.obj, features = features, ncol = 2)
+exh_T <- combined.obj %>%
+  subset(., subset = new_cluster == "T cell exhausted")
+exh_T <- SetIdent(exh_T, value = exh_T@meta.data$orig.ident) 
+VlnPlot(exh_T, features = "Ctla4")
 
+### 9.抓出T cell進行分析 -------------------------------------------------------
+act_T <- combined.obj %>%
+  subset(., subset = new_cluster == "T cell activated")
+act_T <- SetIdent(act_T, value = act_T@meta.data$orig.ident) 
+t_de_gene <- FindAllMarkers(act_T) %>% filter(cluster == "kl")
+# 創建T cell activated violin plot
+VlnPlot(act_T, features = "Tcf7")
 
+# GO分析
+library(clusterProfiler)
+library(enrichplot)
 
+head(t_de_gene)
+organism <- "org.Mm.eg.db"
+original_t_gene_list <- t_de_gene$avg_log2FC
+names(original_t_gene_list) <- t_de_gene$gene
+gsea_t_gene_list <- na.omit(original_t_gene_list) %>% 
+  sort(., decreasing = TRUE)
 
+t_gse <- clusterProfiler::gseGO(geneList = gsea_t_gene_list, 
+                              ont = "ALL",      # "BP", "MF", "CC"
+                              keyType = "SYMBOL", 
+                              nPerm = 10000, 
+                              minGSSize = 3, 
+                              maxGSSize = 800, 
+                              pvalueCutoff = 0.05, 
+                              verbose = TRUE, 
+                              OrgDb = organism, 
+                              pAdjustMethod = "none")
+# gsea dotplot
+dotplot(t_gse, split=".sign") + facet_grid(~.sign)
 
+### 10.抓出cancer cell進行分析 ------------------------------------------------------- 
+cancer <- combined.obj %>%
+  subset(., subset = new_cluster == c("cancer cell1","cancer cell2"))
+cancer <- SetIdent(cancer, value = cancer@meta.data$orig.ident) 
+c_de_gene <- FindAllMarkers(cancer) %>% filter(cluster == "kl")
 
-
-
-# feature <- list(top10$gene)
-# combined.obj <- Seurat::AddModuleScore(combined.obj, features = sg, name = "sg")
-# FeaturePlot(combined.obj, reduction = "umap", features = "sg1")
-# FeaturePlot(combined.obj, reduction = "umap", features = "sg2")
-
-
-# combined.obj[[]] %>% head() --------------------------------------------------
-# Seurat::Idents(combined.obj)[1:10]
-# Seurat::Idents(combined.obj) <- "integrated_snn_res.0.5"
-# Seurat::DimPlot(combined.obj, reduction="umap", group.by = "integrated_snn_res.0.5")
-# Seurat::Idents(combined.obj) <- "integrated_snn_res.1"
-# Seurat::DimPlot(combined.obj, reduction="umap", group.by = "integrated_snn_res.1")
-
-# # 手動更改cluster
-# combined.obj@meta.data$new_column <- combined.obj@meta.data$RNA_snn_res.0.5
-# combined.obj@meta.data$new_column[combined.obj@meta.data$new_column == 5] <- 0
-# table(combined.obj@meta.data$new_column)
-
-# 13. Cell doublet prediction
-# 載入scDblFinder
-# library("scDblFinder")
-# count.df <- Seurat::GetAssayData(combined.obj, layer = "counts", assay = "RNA")
-# dbl <- scDblFinder(count.df, 
-#                    clusters = Seurat::Idents(combined.obj),
-#                    verbose = FALSE)
-# 
-# combined.obj[["dbl.class"]] <- dbl$scDblFinder.class
-# combined.obj[["dbl.score"]] <- dbl$scDblFinder.score
-# head(dbl)
-# combined.obj[[]] %>% head()
-# DimPlot(combined.obj, reduction="tsne", group.by = "dbl.class")
-
-# # 14. Cell cycle phase prediction and regression 
-# cc.genes  # 內建cell cycle gene list
-# #
-# mouse.cc.genes <- list(
-#   s.genes = stringr::str_to_title(cc.genes$s.genes),
-#   g2m.genes = stringr::str_to_title(cc.genes$g2m.genes)
-# )
-# mouse.cc.genes
-# #### Predict cell cycle phase
-# combined.obj <- Seurat::CellCycleScoring(combined.obj, 
-#                                          s.features = mouse.cc.genes, 
-#                                          g2m.features = mouse.cc.genes, 
-#                                          set.ident = FALSE)
-# # 觀察是否需要Regression
-# Seurat::DimPlot(combined.obj, reduction="umap", group.by = "Phase")
-# 
-# # Regression out of cell cycle phase
-# regress.obj <- Seurat::ScaleData(combined.obj, vars.to.regress = c("S.Score", "G2M.Score"), features = rownames(combined.obj)) %>%
-#   Seurat::RunPCA(npcs = 20, verbose = FALSE) %>%
-#   Seurat::RunUMAP(reduction = "pca", dims = 1:20, verbose = FALSE) %>%
-#   Seurat::RunTSNE(reduction="pca", dims= 1:20, verbose = FALSE) %>%
-#   Seurat::FindNeighbors(reduction = "pca", dims = 1:pcs, verbose = FALSE) %>%
-#   Seurat::FindClusters(resolution = 0.5, verbose = FALSE)
-# Seurat::DimPlot(regress.obj, reduction="umap", group.by = "Phase")
-
-# # 13. Identify marker genes & cluster annotation
-# # suggested reading: https://www.nature.com/articles/s41596-021-00534-0
-# combined.obj <- readRDS("combined.obj.RDS")
-# DimPlot(combined.obj)
-# ### Cluster 2 vs. the others
-# c18.markers <- Seurat::FindMarkers(combined.obj, 
-#                                    ident.1 = 18, min.pct = 0.25,  # 至少要多少比例細胞符合
-#                                    only.pos = TRUE) ### Using default assay
-# head(c18.markers)
-# VlnPlot(combined.obj, features = c("Ebf1"))
-# FeaturePlot(combined.obj, features = c("Ebf1"), reduction = "umap")
-# 
-# write.table(top10[,6:7],file = "top10.csv",sep=",",row.names = F)
-# openxlsx::write.xlsx(top10[,6:7], "top50.xlsx", sheetName = "Sheet1")
-# 
-# Seurat::DimPlot(combined.obj, reduction="umap", label = T)
-# FeaturePlot(combined.obj, reduction="umap", features = "Adgre1", label = T)
-# 
-
-# # Compare c0 vs. c3
-# deg_bw_c0_and_c3 <- Seurat::FindMarkers(combined.obj, 
-#                                         ident.1 = 0, 
-#                                         ident.2 = 3,
-#                                         min.pct = 0.25, 
-#                                         only.pos = FALSE) ### Using default assay
-# head(deg_bw_c0_and_c3)
-# VlnPlot(combined.obj, features = c("Fbn1"))
-# FeaturePlot(combined.obj, features = c("Fbn1"), reduction = "umap")
-# Cell marker database
-# https://panglaodb.se/
-#   http://bio-bigdata.hrbmu.edu.cn/CellMarker/
-#   http://cloud.capitalbiotech.com/SingleCellBase/
-#   Using a set of genes (signature)
-# new.cluster.ids <- c("T cell","T cell ex","Endothelial cell","Macrophage","B cell","Neutrophils","dendritic cell",
-#                       "NK cell","cancer cell1","cancer cell 2","Plasmacytoid dendritic cell")
-# names(new.cluster.ids) <- levels(combined.obj)
+# GO分析
+organism <- "org.Mm.eg.db"
+original_c_gene_list <- c_de_gene$avg_log2FC
+names(original_c_gene_list) <- c_de_gene$gene
+gsea_c_gene_list <- na.omit(original_c_gene_list) %>% 
+  sort(., decreasing = TRUE)
+c_gse <- clusterProfiler::gseGO(geneList = gsea_c_gene_list, 
+                              ont = "ALL",      # "BP", "MF", "CC"
+                              keyType = "SYMBOL", 
+                              nPerm = 10000, 
+                              minGSSize = 3, 
+                              maxGSSize = 800, 
+                              pvalueCutoff = 0.05, 
+                              verbose = TRUE, 
+                              OrgDb = organism, 
+                              pAdjustMethod = "none")
+# gsea dotplot
+dotplot(c_gse, split=".sign") + facet_grid(~.sign)
