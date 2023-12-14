@@ -1,7 +1,7 @@
 ---
 title: "final_project"
 author: "Chin-Yu,Lee"
-date: "2023-12-10"
+date: "2023-12-12"
 output: html_document
 ---
 
@@ -459,3 +459,40 @@ c_gse <- clusterProfiler::gseGO(geneList = gsea_list_c,
 dotplot(c_gse, split=".sign") + facet_grid(~.sign)  # 圖2a
 ```
 
+11.use down regulated gene list(act_T cell)
+
+```{r}
+t_down_gene <- FindAllMarkers(act_T) %>% filter(avg_log2FC < 0 & cluster == "kl")
+head(t_down_gene)
+down_t <- t_down_gene$avg_log2FC
+names(down_t) <- t_down_gene$gene
+down_list_t <- na.omit(down_t) %>% 
+  sort(., decreasing = FALSE)
+go_t <- clusterProfiler::enrichGO(gene = names(down_list_t),
+                                  OrgDb = "org.Mm.eg.db",
+                                  keyType = "SYMBOL",
+                                  ont = "ALL")
+head(as.data.frame(go_t))
+barplot(go_t, showCategory = 20,   # 圖1h
+        title = "Top20 GO pathways downregulated in activated T cells of KL vs. K", 
+        label_format = 60)
+```
+
+12.use down regulated gene list(cancer cell)
+
+```{r}
+c_down_gene <- FindAllMarkers(cancer) %>% filter(avg_log2FC < 0 & cluster == "kl")
+head(c_down_gene)
+down_c <- c_down_gene$avg_log2FC
+names(down_c) <- c_down_gene$gene
+down_list_c <- na.omit(down_c) %>% 
+  sort(., decreasing = FALSE)
+go_c <- clusterProfiler::enrichGO(gene = names(down_list_c),
+                                  OrgDb = "org.Mm.eg.db",
+                                  keyType = "SYMBOL",
+                                  ont = "BP")
+head(as.data.frame(go_c))
+dotplot(go_c, showCategory = 20, 
+        title = "EnrichmentGO_BP Top20 GO pathways downregulated in KL vs. K",
+        label_format = 60)  # 圖2a
+```
