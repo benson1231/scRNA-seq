@@ -142,7 +142,7 @@ features <- Seurat::SelectIntegrationFeatures(object.list = data.list,
 anchors <- Seurat::FindIntegrationAnchors(object.list = data.list, 
                                           anchor.features = features,
                                           verbose = F)
-# this command creates an 'integrated' data assay
+#  this command creates an 'integrated' data assay
 combined.obj <- Seurat::IntegrateData(anchorset = anchors)
 DefaultAssay(combined.obj) <- "integrated"
 dim(combined.obj)
@@ -296,7 +296,9 @@ VlnPlot(exh_T, features = "Ctla4")
 act_T <- combined.obj %>%
   subset(., subset = new_cluster == "T cell activated")
 act_T <- SetIdent(act_T, value = act_T@meta.data$orig.ident) 
-t_de_gene <- FindAllMarkers(act_T) %>% filter(cluster == "kl")
+t_de_gene <- FindAllMarkers(act_T) %>% filter(cluster == "kl") 
+head(t_de_gene)
+
 # 創建T cell activated violin plot
 VlnPlot(act_T, features = "Tcf7")
 
@@ -304,7 +306,6 @@ VlnPlot(act_T, features = "Tcf7")
 library(clusterProfiler)
 library(enrichplot)
 
-head(t_de_gene)
 organism <- "org.Mm.eg.db"
 original_t_gene_list <- t_de_gene$avg_log2FC
 names(original_t_gene_list) <- t_de_gene$gene
@@ -348,3 +349,35 @@ c_gse <- clusterProfiler::gseGO(geneList = gsea_c_gene_list,
                               pAdjustMethod = "none")
 # gsea dotplot
 dotplot(c_gse, split=".sign") + facet_grid(~.sign)
+
+### 11.use down regulated gene list(act_T cell) --------------------------------
+t_down_gene <- FindAllMarkers(act_T) %>% filter(avg_log2FC < 0 & cluster == "kl")
+head(t_down_gene)
+down_t <- t_down_gene$avg_log2FC
+names(down_t) <- t_down_gene$gene
+down_list_t <- na.omit(down_t) %>% 
+  sort(., decreasing = FALSE)
+go_t <- clusterProfiler::enrichGO(gene = names(down_list_t),
+                                  OrgDb = "org.Mm.eg.db",
+                                  keyType = "SYMBOL",
+                                  ont = "ALL")
+as.data.frame(go_t)
+barplot(go_t, showCategory = 20,   # fig.1h
+        title = "Top20 GO pathways downregulated in activated T cells of KL vs. K", 
+        label_format = 60)
+
+### 12.use down regulated gene list(cancer cell) -------------------------------
+c_down_gene <- FindAllMarkers(cancer) %>% filter(avg_log2FC < 0 & cluster == "kl")
+head(c_down_gene)
+down_c <- c_down_gene$avg_log2FC
+names(down_c) <- c_down_gene$gene
+down_list_c <- na.omit(down_c) %>% 
+  sort(., decreasing = FALSE)
+go_c <- clusterProfiler::enrichGO(gene = names(down_list_c),
+                                  OrgDb = "org.Mm.eg.db",
+                                  keyType = "SYMBOL",
+                                  ont = "BP")
+head(as.data.frame(go_c))
+dotplot(go_c, showCategory = 20, 
+        title = "EnrichmentGO_BP Top20 GO pathways downregulated in KL vs. K",
+        label_format = 60)  # fig.2a
