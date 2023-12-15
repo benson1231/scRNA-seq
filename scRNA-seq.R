@@ -240,5 +240,3 @@ regress.obj <- Seurat::ScaleData(seurat.obj, vars.to.regress = c("S.Score", "G2M
   Seurat::FindNeighbors(reduction = "pca", dims = 1:pcs, verbose = FALSE) %>%
   Seurat::FindClusters(resolution = 0.5, verbose = FALSE)
 Seurat::DimPlot(regress.obj, reduction="umap", group.by = "Phase")
-
-
